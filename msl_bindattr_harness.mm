@@ -202,11 +202,6 @@ int main(int argc, char* argv[])
 
         std::cerr << "[+] About to call bindMesh (triggers bindAttribute → OOB write)..." << std::endl;
 
-        mx::ImageHandlerPtr imageHandler = mx::MetalTextureHandler::create(device, mx::StbImageLoader::create());
-        imageHandler->setSearchPath(searchPath);
-        mx::CameraPtr camera = mx::Camera::create();
-        program->prepareUsedResources(encoder, camera, geomHandler, imageHandler, nullptr);
-
         for (const auto& mesh : geomHandler->getMeshes())
         {
             program->bindMesh(encoder, mesh);
