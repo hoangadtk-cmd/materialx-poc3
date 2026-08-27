@@ -66,6 +66,11 @@ workflows:
         script: |
           cd $HOME/poc/build
           export MATERIALX_SEARCH_PATH="$HOME/MaterialX/build/installed:$HOME/MaterialX"
+          export MATERIALX_ROOT="$HOME/MaterialX"
+          echo "[dbg] Checking library paths..."
+          ls -d $HOME/MaterialX/libraries/stdlib/genmsl 2>/dev/null || echo "NOT in source tree"
+          ls -d $HOME/MaterialX/build/installed/libraries/stdlib/genmsl 2>/dev/null || echo "NOT in installed"
+          find $HOME/MaterialX -name "mx_math.metal" 2>/dev/null | head -5 || echo "mx_math.metal NOT FOUND"
 
           echo "=== Running POC: texcoord_vec3.gltf ==="
           echo "TEXCOORD_0 = VEC3 (stride 3) vs shader float2 (stride 2)"

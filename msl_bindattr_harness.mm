@@ -107,6 +107,13 @@ int main(int argc, char* argv[])
 
         // --- 4. Load MaterialX standard libraries ---
         mx::FileSearchPath searchPath = mx::getDefaultDataSearchPath();
+        const char* mxRoot = std::getenv("MATERIALX_ROOT");
+        if (mxRoot)
+        {
+            searchPath.append(mx::FilePath(mxRoot));
+            searchPath.append(mx::FilePath(std::string(mxRoot) + "/build/installed"));
+        }
+        std::cerr << "[dbg] Search path: " << searchPath.asString() << std::endl;
         mx::DocumentPtr stdLib = mx::createDocument();
         mx::loadLibraries({"libraries"}, searchPath, stdLib);
         std::cerr << "[+] Standard libraries loaded." << std::endl;
