@@ -55,12 +55,12 @@ workflows:
       - name: Build POC harness
         script: |
           mkdir -p $HOME/poc/build && cd $HOME/poc/build
-          cmake $FPM_REPOSITORY_DIR \
+          cmake $CM_BUILD_DIR \
             -DCMAKE_BUILD_TYPE=RelWithDebInfo \
             -DMaterialX_DIR=$HOME/MaterialX/build/installed/lib/cmake/MaterialX \
             -DENABLE_ASAN=ON
           cmake --build . -j$(sysctl -n hw.ncpu)
-          cp $FPM_REPOSITORY_DIR/texcoord_vec3.gltf .
+          cp $CM_BUILD_DIR/texcoord_vec3.gltf .
 
       - name: Run POC
         script: |
@@ -71,12 +71,12 @@ workflows:
           echo "TEXCOORD_0 = VEC3 (stride 3) vs shader float2 (stride 2)"
           echo ""
 
-          ./msl_bindattr_poc texcoord_vec3.gltf 2>&1 | tee $FPM_REPOSITORY_DIR/asan_crash.log || true
+          ./msl_bindattr_poc texcoord_vec3.gltf 2>&1 | tee $CM_BUILD_DIR/asan_crash.log || true
 
           echo ""
-          if grep -q "heap-buffer-overflow" $FPM_REPOSITORY_DIR/asan_crash.log; then
+          if grep -q "heap-buffer-overflow" $CM_BUILD_DIR/asan_crash.log; then
             echo "=== CONFIRMED: heap-buffer-overflow in bindAttribute ==="
-          elif grep -q "AddressSanitizer" $FPM_REPOSITORY_DIR/asan_crash.log; then
+          elif grep -q "AddressSanitizer" $CM_BUILD_DIR/asan_crash.log; then
             echo "=== ASan error detected (see log) ==="
           else
             echo "=== No ASan crash — check log ==="
