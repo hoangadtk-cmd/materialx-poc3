@@ -65,7 +65,7 @@ workflows:
       - name: Run POC
         script: |
           cd $HOME/poc/build
-          export MATERIALX_SEARCH_PATH="$HOME/MaterialX"
+          export MATERIALX_SEARCH_PATH="$HOME/MaterialX/build/installed:$HOME/MaterialX"
 
           echo "=== Running POC: texcoord_vec3.gltf ==="
           echo "TEXCOORD_0 = VEC3 (stride 3) vs shader float2 (stride 2)"
