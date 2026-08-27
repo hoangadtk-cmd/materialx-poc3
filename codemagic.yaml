@@ -1,0 +1,86 @@
+workflows:
+  poc-case3-msl:
+    name: "POC Case 3: MSL bindAttribute OOB Write"
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      vars:
+        MATERIALX_COMMIT: "257e02f5b097694e681df6d3780983a5c37c993a"
+        ASAN_OPTIONS: "detect_leaks=0:halt_on_error=1:print_stacktrace=1"
+    scripts:
+      - name: Check Metal device availability
+        script: |
+          echo "=== Checking Metal device ==="
+          swift -e '
+            import Metal
+            if let device = MTLCreateSystemDefaultDevice() {
+              print("MTLCreateSystemDefaultDevice: \(device.name)")
+            } else {
+              print("MTLCreateSystemDefaultDevice returned nil (headless)")
+              let devices = MTLCopyAllDevices()
+              if devices.isEmpty {
+                print("ERROR: No Metal devices at all")
+                exit(1)
+              }
+              for d in devices { print("MTLCopyAllDevices: \(d.name)") }
+            }
+          '
+
+      - name: Clone MaterialX
+        script: |
+          git clone --depth 1 https://github.com/AcademySoftwareFoundation/MaterialX.git $HOME/MaterialX
+          cd $HOME/MaterialX && git fetch --depth 1 origin $MATERIALX_COMMIT && git checkout $MATERIALX_COMMIT
+          echo "Checked out: $(git rev-parse HEAD)"
+
+      - name: Build MaterialX with ASan
+        script: |
+          cd $HOME/MaterialX
+          mkdir -p build && cd build
+          cmake .. \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DCMAKE_CXX_FLAGS="-fsanitize=address -fno-omit-frame-pointer -g" \
+            -DCMAKE_C_FLAGS="-fsanitize=address -fno-omit-frame-pointer -g" \
+            -DCMAKE_OBJCXX_FLAGS="-fsanitize=address -fno-omit-frame-pointer -g" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address" \
+            -DCMAKE_SHARED_LINKER_FLAGS="-fsanitize=address" \
+            -DMATERIALX_BUILD_RENDER=ON \
+            -DMATERIALX_BUILD_RENDER_PLATFORMS=ON \
+            -DMATERIALX_BUILD_GEN_MSL=ON \
+            -DMATERIALX_BUILD_TESTS=OFF \
+            -DMATERIALX_BUILD_PYTHON=OFF \
+            -DCMAKE_INSTALL_PREFIX="$(pwd)/installed"
+          cmake --build . -j$(sysctl -n hw.ncpu)
+          cmake --install .
+
+      - name: Build POC harness
+        script: |
+          mkdir -p $HOME/poc/build && cd $HOME/poc/build
+          cmake $FPM_REPOSITORY_DIR \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DMaterialX_DIR=$HOME/MaterialX/build/installed/lib/cmake/MaterialX \
+            -DENABLE_ASAN=ON
+          cmake --build . -j$(sysctl -n hw.ncpu)
+          cp $FPM_REPOSITORY_DIR/texcoord_vec3.gltf .
+
+      - name: Run POC
+        script: |
+          cd $HOME/poc/build
+          export MATERIALX_SEARCH_PATH="$HOME/MaterialX"
+
+          echo "=== Running POC: texcoord_vec3.gltf ==="
+          echo "TEXCOORD_0 = VEC3 (stride 3) vs shader float2 (stride 2)"
+          echo ""
+
+          ./msl_bindattr_poc texcoord_vec3.gltf 2>&1 | tee $FPM_REPOSITORY_DIR/asan_crash.log || true
+
+          echo ""
+          if grep -q "heap-buffer-overflow" $FPM_REPOSITORY_DIR/asan_crash.log; then
+            echo "=== CONFIRMED: heap-buffer-overflow in bindAttribute ==="
+          elif grep -q "AddressSanitizer" $FPM_REPOSITORY_DIR/asan_crash.log; then
+            echo "=== ASan error detected (see log) ==="
+          else
+            echo "=== No ASan crash — check log ==="
+          fi
+
+    artifacts:
+      - asan_crash.log
